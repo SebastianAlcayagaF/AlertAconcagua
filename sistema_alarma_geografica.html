@@ -1,0 +1,936 @@
+<html><head><base href="/">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistema de Alarma Geográfica - Bomberos</title>
+    
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    
+    <style>
+      :root {
+        --primary: #e63946;
+        --secondary: #457b9d;
+        --background: #f1faee;
+        --dark: #1d3557;
+      }
+    
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+    
+      body {
+        background-color: var(--background);
+      }
+    
+      .container {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        height: 100vh;
+      }
+    
+      .sidebar {
+        background-color: var(--dark);
+        color: white;
+        padding: 20px;
+        overflow-y: auto;
+      }
+    
+      .sidebar h2 {
+        color: var(--primary);
+        margin-bottom: 20px;
+      }
+    
+      #map {
+        width: 100%;
+        height: 100vh;
+        cursor: crosshair;
+      }
+    
+      .alert-form {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+    
+      .alert-form input, .alert-form select, .alert-form button {
+        width: 100%;
+        padding: 8px;
+        margin: 5px 0;
+        border-radius: 4px;
+        border: none;
+      }
+    
+      .location-container {
+        position: relative;
+      }
+    
+      .location-button {
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--primary);
+        border: none;
+        width: 30px !important;
+        height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    
+      .location-button svg {
+        width: 16px;
+        height: 16px;
+        fill: white;
+      }
+    
+      .alert-form button {
+        background-color: var(--primary);
+        color: white;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+    
+      .alert-form button:hover {
+        background-color: #c1121f;
+      }
+    
+      .alert-list {
+        margin-top: 20px;
+      }
+    
+      .alert-item {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+    
+      .alert-item:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+    
+      .alert-item.high {
+        border-left: 4px solid #e63946;
+      }
+    
+      .alert-item.medium {
+        border-left: 4px solid #f4a261;
+      }
+    
+      .alert-item.low {
+        border-left: 4px solid #2a9d8f;
+      }
+    
+      #loading-location {
+        display: none;
+        color: white;
+        font-size: 0.8em;
+        margin-top: 5px;
+      }
+    
+      .map-instructions {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        z-index: 1000;
+        pointer-events: none;
+      }
+    
+      .temp-marker {
+        animation: pulse 1.5s infinite;
+      }
+    
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 0.8;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+    
+      .leaflet-popup-content-wrapper {
+        background-color: var(--background);
+        color: var(--dark);
+        border-radius: 8px;
+        padding: 5px;
+      }
+    
+      .leaflet-popup-content {
+        margin: 10px;
+        min-width: 200px;
+      }
+    
+      .alert-popup {
+        font-size: 14px;
+      }
+    
+      .alert-popup .type {
+        font-weight: bold;
+        color: var(--primary);
+        margin-bottom: 5px;
+        text-transform: capitalize;
+      }
+    
+      .alert-popup .priority {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: white;
+        font-size: 12px;
+        margin: 5px 0;
+      }
+    
+      .alert-popup .description {
+        margin: 5px 0;
+      }
+    
+      .alert-popup .location {
+        font-style: italic;
+        margin: 5px 0;
+      }
+    
+      .alert-popup .timestamp {
+        color: #666;
+        font-size: 12px;
+      }
+    
+      .alert-popup .user-info {
+        margin: 10px 0;
+        padding: 8px;
+        background: rgba(69, 123, 157, 0.1);
+        border-radius: 4px;
+      }
+    
+      .alert-popup .user-info span {
+        display: block;
+        margin: 2px 0;
+        font-size: 13px;
+      }
+    
+      .chat-container {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        margin-top: 20px;
+        padding: 15px;
+      }
+    
+      .chat-messages {
+        height: 200px;
+        overflow-y: auto;
+        margin: 10px 0;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+      }
+    
+      .message {
+        margin: 8px 0;
+        padding: 8px 12px;
+        border-radius: 15px;
+        max-width: 80%;
+        word-wrap: break-word;
+      }
+    
+      .message.user {
+        background-color: var(--primary);
+        margin-left: auto;
+      }
+    
+      .message.bot {
+        background-color: var(--secondary);
+      }
+    
+      .chat-input {
+        display: flex;
+        gap: 8px;
+      }
+    
+      .chat-input input {
+        flex: 1;
+        padding: 8px;
+        border: none;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.9);
+      }
+    
+      .chat-input button {
+        background: var(--primary);
+        border: none;
+        border-radius: 4px;
+        width: 40px;
+        height: 40px;
+        padding: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    
+      .chat-input button:hover {
+        background: #c1121f;
+      }
+    
+      .route-button {
+        background-color: var(--secondary);
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 10px;
+        width: 100%;
+        transition: background-color 0.3s;
+      }
+    
+      .route-button:hover {
+        background-color: #2b5d77;
+      }
+    
+      .popup-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 10px;
+      }
+    
+      .cancel-button {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+    
+      .cancel-button:hover {
+        background-color: #c82333;
+      }
+    
+      @media (max-width: 768px) {
+        .container {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+    
+        .sidebar {
+          height: auto;
+          max-height: 50vh;
+          overflow-y: auto;
+        }
+    
+        #map {
+          height: 50vh;
+        }
+    
+        .chat-messages {
+          height: 150px;
+        }
+    
+        .alert-form input, 
+        .alert-form select, 
+        .alert-form button,
+        .chat-input input {
+          padding: 12px; /* Larger touch targets */
+        }
+    
+        .chat-input button {
+          width: 50px;
+          height: 50px;
+        }
+    
+        .map-instructions {
+          font-size: 12px;
+          top: 10px;
+          right: 10px;
+          padding: 8px;
+        }
+    
+        .leaflet-popup-content {
+          min-width: 150px;
+        }
+    
+        .alert-popup {
+          font-size: 12px;
+        }
+      }
+    
+      @media (max-width: 480px) {
+        .sidebar {
+          padding: 10px;
+        }
+    
+        .alert-form {
+          padding: 10px;
+        }
+    
+        .chat-container {
+          padding: 10px;
+        }
+    
+        .map-instructions {
+          max-width: 200px;
+        }
+      }
+    </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="sidebar">
+          <h2>Sistema de Alarma</h2>
+          <div class="alert-form">
+            <h3>Nueva Alerta</h3>
+            <div class="location-container">
+              <input type="text" id="location" placeholder="Dirección" readonly>
+              <button class="location-button" onclick="getCurrentLocation()" title="Obtener ubicación actual">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V2h-2v1.06C6.83 3.52 3.52 6.83 3.06 11H2v2h1.06c.46 4.17 3.77 7.48 7.94 7.94V22h2v-1.06c4.17-.46 7.48-3.77 7.94-7.94H22v-2h-1.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+                </svg>
+              </button>
+            </div>
+            <div id="loading-location">Obteniendo ubicación...</div>
+            <select id="type">
+              <option value="fire">Incendio</option>
+              <option value="rescue">Rescate</option>
+              <option value="hazmat">Materiales Peligrosos</option>
+            </select>
+            <select id="priority">
+              <option value="high">Alta Prioridad</option>
+              <option value="medium">Media Prioridad</option>
+              <option value="low">Baja Prioridad</option>
+            </select>
+            <input type="text" id="description" placeholder="Descripción">
+            <input type="text" id="userName" placeholder="Nombre del Informante">
+            <input type="tel" id="userPhone" placeholder="Teléfono de Contacto">
+            <button onclick="createAlert()">Crear Alerta</button>
+            
+            <!-- Botones de emergencia -->
+            <button onclick="window.location.href='tel:133'" style="background-color: #1d3557; color: white;">Llamar a Carabineros (133)</button>
+            <button onclick="window.location.href='tel:132'" style="background-color: #1d3557; color: white;">Llamar a Bomberos (132)</button>
+            <button onclick="window.location.href='tel:131'" style="background-color: #1d3557; color: white;">Llamar a Ambulancia (131)</button>
+          </div>
+          <div class="alert-list" id="alertList">
+            <!-- Las alertas se agregarán aquí dinámicamente -->
+          </div>
+          <div class="chat-container">
+            <h3>Asistente Virtual</h3>
+            <div class="chat-messages" id="chatMessages">
+              <div class="message bot">
+                ¡Hola! Soy el asistente virtual del sistema de alarmas. ¿En qué puedo ayudarte?
+              </div>
+            </div>
+            <div class="chat-input">
+              <input type="text" id="chatInput" placeholder="Escribe tu mensaje...">
+              <button onclick="sendMessage()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+                  <path fill="white" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="map">
+          <div class="map-instructions">
+            Haz clic en el mapa para crear una nueva alerta
+          </div>
+        </div>
+      </div>
+    
+    <script>
+    let map;
+    let markers = [];
+    let alerts = [];
+    let currentLocationMarker = null;
+    let tempMarker = null;
+    let clickedLocation = null;
+    let geocoder = L.Control.Geocoder.nominatim();
+    let routingControl = null;
+    const alertIcons = {
+      fire: '🔥',
+      rescue: '🚨',
+      hazmat: '☢️'
+    };
+    
+    // Inicializar el mapa
+    function initMap() {
+      map = L.map('map', {
+        center: [-32.7500, -70.7233],
+        zoom: 14,
+        minZoom: 12,
+        maxZoom: 18,
+        maxBounds: [
+          [-32.8000, -70.8000],
+          [-32.7000, -70.6500]
+        ]
+      });
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+    
+      map.on('click', handleMapClick);
+    }
+    
+    // Manejar el clic en el mapa
+    async function handleMapClick(e) {
+      const { lat, lng } = e.latlng;
+      clickedLocation = { lat, lng };
+    
+      // Remover marcador temporal anterior si existe
+      if (tempMarker) {
+        map.removeLayer(tempMarker);
+      }
+    
+      // Crear marcador temporal con animación
+      tempMarker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: 'temp-marker',
+          html: `<div style="background-color: #e63946; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>`
+        })
+      }).addTo(map);
+    
+      // Obtener dirección
+      try {
+        const location = await getAddressFromCoordinates(lat, lng);
+        document.getElementById('location').value = location;
+      } catch (error) {
+        console.error('Error al obtener la dirección:', error);
+        document.getElementById('location').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      }
+    }
+    
+    // Obtener dirección desde coordenadas usando geocodificación inversa
+    async function getAddressFromCoordinates(lat, lng) {
+      return new Promise((resolve, reject) => {
+        geocoder.reverse({ lat, lng }, map.getZoom(), results => {
+          if (results.length > 0) {
+            resolve(results[0].name);
+          } else {
+            reject('No se encontró dirección');
+          }
+        });
+      });
+    }
+    
+    // Obtener la ubicación actual del usuario
+    function getCurrentLocation() {
+      const loadingElement = document.getElementById('loading-location');
+      loadingElement.style.display = 'block';
+    
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            clickedLocation = { lat: latitude, lng: longitude };
+    
+            // Remove existing temp marker if any
+            if (tempMarker) {
+              map.removeLayer(tempMarker);
+            }
+    
+            // Add new marker for current location with blue color
+            tempMarker = L.marker([latitude, longitude], {
+              icon: L.divIcon({
+                className: 'temp-marker',
+                html: `<div style="background-color: #2196F3; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>`
+              })
+            }).addTo(map);
+    
+            // Center map on user's location with animation
+            map.setView([latitude, longitude], 16, {
+              animate: true,
+              duration: 1
+            });
+    
+            try {
+              // Get address using reverse geocoding
+              const location = await getAddressFromCoordinates(latitude, longitude);
+              document.getElementById('location').value = location;
+            } catch (error) {
+              console.error('Error al obtener la dirección:', error);
+              document.getElementById('location').value = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+            }
+    
+            loadingElement.style.display = 'none';
+          },
+          (error) => {
+            console.error('Error al obtener la ubicación:', error);
+            loadingElement.style.display = 'none';
+            alert('No se pudo obtener tu ubicación. Por favor, haz clic en el mapa para seleccionar la ubicación.');
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          }
+        );
+      } else {
+        loadingElement.style.display = 'none';
+        alert('Tu navegador no soporta geolocalización');
+      }
+    }
+    
+    // Crear una nueva alerta
+    function createAlert() {
+      if (!clickedLocation) {
+          alert('Por favor, selecciona una ubicación en el mapa primero');
+          return;
+      }
+
+      const location = document.getElementById('location').value;
+      const type = document.getElementById('type').value;
+      const priority = document.getElementById('priority').value;
+      const description = document.getElementById('description').value;
+      const userName = document.getElementById('userName').value;
+      const userPhone = document.getElementById('userPhone').value;
+
+      if (!userName || !userPhone) {
+          alert('Por favor complete la información de contacto');
+          return;
+      }
+
+      const alertData = {
+          latitud: clickedLocation.lat,
+          longitud: clickedLocation.lng,
+          ubicacion: location,
+          tipo: type,
+          prioridad: priority,
+          descripcion: description,
+          nombre_usuario: userName,
+          telefono_usuario: userPhone
+      };
+
+      // Enviar los datos al archivo PHP usando fetch
+      fetch('guardar_alerta.php', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams(alertData).toString()
+      })
+      .then(response => response.text())
+      .then(data => {
+          alert(data); // Mostrar mensaje del servidor
+          // Limpiar el formulario y el estado del marcador
+          document.getElementById('location').value = '';
+          document.getElementById('description').value = '';
+          document.getElementById('userName').value = '';
+          document.getElementById('userPhone').value = '';
+          clickedLocation = null;
+
+          if (tempMarker) {
+              map.removeLayer(tempMarker);
+              tempMarker = null;
+          }
+      })
+      .catch(error => {
+          console.error('Error al enviar la alerta:', error);
+          alert('Hubo un error al registrar la alerta. Por favor, intenta nuevamente.');
+      });
+  }
+    
+    // Agregar un marcador al mapa
+    function addMarkerToMap(alert) {
+      const icon = L.divIcon({
+        className: 'custom-marker',
+        html: `<div style="background-color: ${getPriorityColor(alert.priority)}; 
+               width: 30px; height: 30px; border-radius: 50%; border: 2px solid white;
+               display: flex; align-items: center; justify-content: center;
+               font-size: 16px;">
+               ${alertIcons[alert.type]}</div>`
+      });
+    
+      const priorityText = {
+        'high': 'Alta Prioridad',
+        'medium': 'Media Prioridad',
+        'low': 'Baja Prioridad'
+      };
+    
+      const typeText = {
+        'fire': '🔥 Incendio',
+        'rescue': '🚨 Rescate',
+        'hazmat': '☢️ Materiales Peligrosos'
+      };
+    
+      const popupContent = `
+        <div class="alert-popup">
+          <div class="type">${typeText[alert.type]}</div>
+          <div class="priority" style="background-color: ${getPriorityColor(alert.priority)}">${priorityText[alert.priority]}</div>
+          <div class="description">${alert.description}</div>
+          <div class="location">📍 ${alert.location}</div>
+          <div class="timestamp">🕒 ${alert.timestamp.toLocaleString()}</div>
+          <div class="user-info">
+            <span>👤 Informante: ${alert.user.name}</span>
+            <span>📞 Contacto: ${alert.user.phone}</span>
+          </div>
+          <div class="popup-buttons">
+            <button class="route-button" onclick="calculateRoute(${alert.lat}, ${alert.lng})">
+              🚗 Ir a ubicación
+            </button>
+            <button class="cancel-button" onclick="cancelAlert(${alert.id})">
+              ❌ Cancelar Alerta
+            </button>
+          </div>
+        </div>
+      `;
+    
+      const marker = L.marker([alert.lat, alert.lng], {icon: icon})
+        .bindPopup(popupContent, {
+          closeButton: true,
+          closeOnClick: false,
+          autoClose: false
+        })
+        .addTo(map);
+    
+      marker.on('click', () => {
+        marker.openPopup();
+      });
+    
+      markers.push(marker);
+    }
+    
+    // Actualizar la lista de alertas
+    function updateAlertList() {
+      const alertList = document.getElementById('alertList');
+      alertList.innerHTML = '';
+    
+      alerts.sort((a, b) => b.timestamp - a.timestamp).forEach(alert => {
+        const alertElement = document.createElement('div');
+        alertElement.className = `alert-item ${alert.priority}`;
+        alertElement.innerHTML = `
+          <strong>${alertIcons[alert.type]} ${alert.type}</strong><br>
+          📍 ${alert.location}<br>
+          👤 ${alert.user.name}<br>
+          <small>🕒 ${alert.timestamp.toLocaleString()}</small>
+        `;
+        alertElement.onclick = () => {
+          map.setView([alert.lat, alert.lng], 16);
+        };
+        alertList.appendChild(alertElement);
+      });
+    }
+    
+    function getPriorityColor(priority) {
+      switch(priority) {
+        case 'high': return '#e63946';
+        case 'medium': return '#f4a261';
+        case 'low': return '#2a9d8f';
+        default: return '#457b9d';
+      }
+    }
+    
+    // Función para calcular la ruta
+    function calculateRoute(destLat, destLng) {
+      if (routingControl) {
+        map.removeControl(routingControl);
+      }
+    
+      if (!navigator.geolocation) {
+        alert('Geolocalización no disponible');
+        return;
+      }
+    
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude: startLat, longitude: startLng } = position.coords;
+          
+          routingControl = L.Routing.control({
+            waypoints: [
+              L.latLng(startLat, startLng),
+              L.latLng(destLat, destLng)
+            ],
+            routeWhileDragging: false,
+            lineOptions: {
+              styles: [{ color: '#457b9d', weight: 6 }]
+            },
+            language: 'es',
+            showAlternatives: true,
+            altLineOptions: {
+              styles: [
+                { color: '#2b5d77', weight: 4, opacity: 0.7 }
+              ]
+            }
+          }).addTo(map);
+    
+          map.closePopup();
+        },
+        (error) => {
+          alert('Error al obtener tu ubicación actual. Por favor, intenta de nuevo.');
+          console.error(error);
+        }
+      );
+    }
+    
+    // Chatbot functionality
+    function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const message = input.value.trim();
+      
+      if (!message) return;
+      
+      // Add user message
+      addMessage(message, 'user');
+      input.value = '';
+      
+      // Generate bot response
+      setTimeout(() => {
+        const response = generateResponse(message);
+        addMessage(response, 'bot');
+      }, 500);
+    }
+    
+    function addMessage(text, sender) {
+      const chatMessages = document.getElementById('chatMessages');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${sender}`;
+      messageDiv.textContent = text;
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    
+    function generateResponse(message) {
+      message = message.toLowerCase().trim();
+      
+      const patterns = {
+        greeting: /(hola|buenos dias|buenas tardes|buenas noches|saludos|hey)/,
+        emergency: /(emergencia|urgente|ayuda|socorro)/,
+        alert: /(crear|nueva|generar|registrar).*(alerta|emergencia|aviso)/,
+        location: /(ubicacion|direccion|gps|donde|lugar|posicion)/,
+        status: /(estado|situacion|como va|activas|pendientes)/,
+        priority: /(prioridad|urgencia|importancia|grave)/,
+        types: /(incendio|rescate|materiales peligrosos|tipo)/
+      };
+    
+      const activeAlerts = alerts.length;
+      const highPriorityAlerts = alerts.filter(a => a.priority === 'high').length;
+    
+      if (patterns.greeting.test(message)) {
+        return '¡Hola! Soy el asistente del sistema de alarmas. Puedo ayudarte con la gestión de alertas, ubicaciones y emergencias. ¿En qué puedo ayudarte?';
+      }
+    
+      if (patterns.emergency.test(message)) {
+        return `Si tienes una emergencia, por favor usa el formulario de alerta inmediatamente. Actualmente hay ${activeAlerts} alertas activas, ${highPriorityAlerts} de alta prioridad.`;
+      }
+    
+      if (patterns.alert.test(message)) {
+        return 'Para crear una alerta:\n1. Selecciona la ubicación (clic en mapa o botón GPS)\n2. Elige el tipo de emergencia\n3. Selecciona la prioridad\n4. Añade una descripción\n5. Presiona "Crear Alerta"';
+      }
+    
+      if (patterns.location.test(message)) {
+        return 'Tienes dos opciones para indicar la ubicación:\n1. Hacer clic directamente en el mapa\n2. Usar el botón GPS para tu ubicación actual\nEl sistema convertirá automáticamente las coordenadas en una dirección.';
+      }
+    
+      if (patterns.status.test(message)) {
+        return `Estado actual del sistema:\n- ${activeAlerts} alertas activas\n- ${highPriorityAlerts} alertas de alta prioridad\n- Sistema operando en San Felipe, Chile\n- Cobertura de emergencias: Incendios, Rescates y Materiales Peligrosos`;
+      }
+    
+      if (patterns.priority.test(message)) {
+        return 'Manejamos tres niveles de prioridad:\n- Alta: Emergencias críticas que requieren respuesta inmediata\n- Media: Situaciones urgentes pero contenidas\n- Baja: Incidentes que requieren atención pero no son críticos';
+      }
+    
+      if (patterns.types.test(message)) {
+        return 'Los tipos de emergencias que manejamos son:\n- Incendios\n- Rescates\n- Materiales Peligrosos (HAZMAT)\nCada tipo tiene sus propios protocolos y prioridades.';
+      }
+    
+      return 'Puedo ayudarte con:\n- Crear y gestionar alertas\n- Información sobre ubicaciones\n- Estado del sistema\n- Tipos de emergencias\n- Prioridades\n¿Podrías ser más específico con tu consulta?';
+    }
+    
+    // Add enter key support for chat
+    document.getElementById('chatInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+    
+    // Inicializar el mapa cuando se carga la página
+    window.onload = () => {
+      initMap();
+    };
+    
+    // Simular algunas alertas iniciales
+    setTimeout(() => {
+      const initialAlerts = [
+        {
+          location: "Plaza de Armas de San Felipe",
+          type: "fire",
+          priority: "high",
+          description: "Incendio en edificio comercial",
+          lat: -32.7500,
+          lng: -70.7233,
+          timestamp: new Date(),
+          user: {
+            name: "Juan Pérez",
+            phone: "+56 9 1234 5678"
+          }
+        },
+        {
+          location: "Hospital San Camilo",
+          type: "rescue",
+          priority: "medium",
+          description: "Emergencia médica",
+          lat: -32.7489,
+          lng: -70.7255,
+          timestamp: new Date(),
+          user: {
+            name: "María González",
+            phone: "+56 9 8765 4321"
+          }
+        }
+      ];
+    
+      initialAlerts.forEach(alert => {
+        alerts.push({...alert, id: Date.now()});
+        addMarkerToMap(alert);
+      });
+      updateAlertList();
+    }, 1000);
+    
+    // Cancelar alerta
+    function cancelAlert(alertId) {
+      if (confirm('¿Estás seguro de que deseas cancelar esta alerta?')) {
+        // Find alert and marker indexes
+        const alertIndex = alerts.findIndex(a => a.id === alertId);
+        
+        if (alertIndex !== -1) {
+          // Remove marker from map
+          map.removeLayer(markers[alertIndex]);
+          markers.splice(alertIndex, 1);
+          
+          // Remove alert from array
+          alerts.splice(alertIndex, 1);
+          
+          // Update alert list
+          updateAlertList();
+          
+          // Close popup
+          map.closePopup();
+        }
+      }
+    }
+    </script>
+    </body>
+    </html>

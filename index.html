@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AlertAconcagua</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(45deg, #6b48ff, #1e90ff);
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .bell-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .bell {
+            fill: #6b48ff;
+            width: 40px;
+            height: 40px;
+            animation: ring 2s ease-in-out infinite;
+            transform-origin: top;
+        }
+
+        @keyframes ring {
+            0%, 100% {
+                transform: rotate(0);
+            }
+            5%, 15% {
+                transform: rotate(25deg);
+            }
+            10%, 20% {
+                transform: rotate(-25deg);
+            }
+        }
+
+        h2 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: #6b48ff;
+            outline: none;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: #6b48ff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .login-btn:hover {
+            background: #5535ff;
+        }
+
+        .create-account {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .create-account a {
+            color: #6b48ff;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .create-account a:hover {
+            color: #5535ff;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="bell-container">
+            <svg class="bell" viewBox="0 0 24 24">
+                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/>
+            </svg>
+        </div>
+        <h2>Iniciar Sesión</h2>
+        <form action="login.php" method="post">
+            <div class="form-group">
+                <label for="username">Usuario</label>
+                <input type="text" name="username" id="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Contraseña</label>
+                <input type="password" name="password" id="password" required>
+            </div>
+            <button type="submit" class="login-btn">Iniciar Sesión</button>
+        </form>
+        <div class="create-account">
+            <p>¿No tienes cuenta? <a href="registro.html">Crear cuenta</a></p>
+        </div>
+    </div>
+</body>
+</html>
